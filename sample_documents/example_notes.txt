@@ -1,0 +1,125 @@
+GENERATIVE AI AND RETRIEVAL-AUGMENTED GENERATION (RAG)
+Study Notes for LocalDoc QA Testing
+
+1. What is Generative AI?
+Generative Artificial Intelligence (Generative AI or GenAI) refers to AI systems that generate new content based on patterns learned from training data. The output may include text, images, audio, video, code, or structured data. A generative model does not simply look up and repeat a stored answer; it generates an output in response to a prompt.
+
+A prompt is the instruction or input provided to a model. Prompt quality can influence the relevance, format, and usefulness of the response. However, even a clear prompt does not guarantee that the model will always be correct.
+
+2. What is a Large Language Model?
+A Large Language Model (LLM) is a model trained to process and generate human language. It can perform tasks such as answering questions, summarizing text, drafting content, classifying information, and generating code. An LLM produces responses based on patterns learned during training and the context supplied at inference time.
+
+An LLM can produce incorrect statements or unsupported details. This behavior is commonly called a hallucination. A confident tone does not prove that an answer is factually correct. For tasks that require evidence, the answer should be checked against reliable source material.
+
+3. What is Retrieval-Augmented Generation?
+Retrieval-Augmented Generation (RAG) is a pattern that combines information retrieval with language generation. Instead of asking a language model to answer only from its training knowledge, a RAG application first searches a supplied knowledge source for relevant information. It then provides the retrieved passages to the language model as context for answering the user's question.
+
+A basic RAG workflow contains these stages:
+1. Document loading
+2. Text splitting or chunking
+3. Embedding generation
+4. Vector indexing
+5. Query embedding and retrieval
+6. Context preparation
+7. Answer generation
+8. Source display and answer verification
+
+RAG is useful when answers should be grounded in a defined collection of documents, such as course notes, policy documents, technical manuals, product documentation, or internal knowledge bases. The quality of the answer depends partly on the quality of the source documents and the relevance of the retrieved passages.
+
+4. Document Loading
+Document loading converts files into text and metadata that the application can process. Different file formats need different readers. A PDF loader extracts text from PDF pages, while a text loader reads plain-text files. Markdown files can also be read as text.
+
+Metadata describes the origin or properties of a document. Useful metadata includes the source filename, PDF page number, and chunk position. Preserving metadata allows an application to show where a retrieved passage came from.
+
+A scanned PDF may contain page images rather than selectable text. A basic text extraction library may return little or no text from such a file. Optical Character Recognition (OCR) is needed when text must be extracted from scanned page images. OCR is outside the scope of this starter project.
+
+5. Text Splitting and Chunking
+Long documents are commonly split into smaller passages called chunks. Chunking makes retrieval more manageable and allows the application to provide focused context to the language model.
+
+A recursive character text splitter attempts to divide text at natural boundaries, such as paragraph breaks, line breaks, and spaces, before splitting at smaller boundaries. This can help keep related text together.
+
+Chunk size determines the approximate maximum length of each chunk. Chunk overlap repeats a small portion of text between neighboring chunks. Overlap can preserve context when a relevant idea crosses a chunk boundary.
+
+For this project, the default chunk size is 800 characters and the overlap is 120 characters. These are practical starting settings rather than universally optimal values. A very small chunk may lose context, while a very large chunk may contain irrelevant material or consume more of the model's context window.
+
+6. Embeddings
+An embedding model converts text into a numerical vector. Texts with related meanings may have vectors that are close under a selected distance or similarity measure. Embeddings allow the system to retrieve passages by semantic similarity rather than requiring an exact keyword match.
+
+This project uses a local Sentence Transformers embedding model. The first run may download the model files. After download, embedding generation can run on the user's computer, subject to local hardware and installed dependencies.
+
+The same embedding model and compatible configuration must be used when creating document vectors and embedding search queries. If the vector representation changes, the index should be rebuilt.
+
+7. Vector Stores and FAISS
+A vector store keeps document vectors in a structure that supports similarity search. FAISS is a library for efficient similarity search over dense vectors. In this project, FAISS stores the vectors for chunks in memory while the application session is active.
+
+When a user submits a question, the system embeds the question and searches for nearby document vectors. The top-k setting determines how many candidate chunks are requested before filtering. The current default top-k value is four.
+
+The current project builds the index after the user uploads documents. The index is held in Streamlit session state and is not permanently saved to disk. Refreshing or restarting the application may require processing the documents again.
+
+8. Retrieval and Relevance Thresholds
+Retrieval identifies passages that may help answer a question. A retrieval result is evidence to inspect, not proof that the passage answers the question.
+
+The application uses FAISS distance results and a configurable maximum-distance threshold. For the selected distance configuration, lower squared L2 distances indicate closer vectors. Results beyond the configured maximum distance are excluded.
+
+A distance threshold is only a heuristic. A relevant passage can be excluded if the threshold is too strict, and an irrelevant passage can remain if the threshold is too permissive. The threshold should be tested with example questions and documents. It should not be described as a calibrated confidence score.
+
+The app displays the retrieved passages so the user can inspect the evidence. Showing evidence helps with transparency, but it does not automatically guarantee that the generated answer is correct.
+
+9. Grounded Answer Generation
+After retrieval, the application sends the user's question and the selected passages to the Gemini API. The prompt instructs the model to answer using only the supplied passages, avoid guessing, and cite passage numbers such as [1] or [2].
+
+The model is asked to return a specific fallback response when the passages do not contain enough evidence:
+“I could not find the answer in the provided documents.”
+
+Prompt instructions can reduce unsupported answers but cannot guarantee perfect compliance. The generated answer should be compared with the displayed passages, especially for important decisions or technical details.
+
+10. Source Citations and Retrieved Passages
+A source citation helps the reader identify which retrieved passage supports a statement. In this project, passages are numbered for the current answer, and the model is instructed to refer to those numbers in square brackets.
+
+The interface also displays the source filename and, for PDF files, the page number when available. For TXT and Markdown files, the source filename is displayed without a page number.
+
+A passage number is meaningful only for the current retrieval result. It is not a permanent identifier. The displayed text and filename allow the user to inspect the underlying evidence.
+
+11. Local Components and Gemini API
+The application uses a hybrid architecture. File reading, text splitting, local embedding generation, and FAISS retrieval run on the user's computer. Gemini is used for answer generation through an API.
+
+This means the application does not require Ollama or a locally hosted language model. However, an internet connection and a valid Gemini API key with available quota are required to generate answers.
+
+The user's question and the retrieved document passages are sent to the Gemini service. Users should avoid uploading confidential or sensitive material and should review the applicable API terms and data handling policies.
+
+The free tier, model availability, and rate limits may change. The user should check current official pricing and quota information rather than assuming unlimited free usage.
+
+12. The Role of Streamlit
+Streamlit provides the user interface for the application. It displays a document uploader, processing controls, a question input, the answer, and expandable retrieved passages.
+
+The project keeps the Streamlit interface in app.py. The RAG implementation is separated into modules under the rag folder. This separation makes the code easier to understand and maintain because the interface, loading, chunking, embedding, retrieval, generation, and orchestration responsibilities are not all mixed into one file.
+
+13. The RAG Pipeline in This Project
+The pipeline begins when the user uploads one or more PDF, TXT, or Markdown files. The document loader extracts text and records the filename and page metadata where available. The chunking module splits the text into overlapping pieces.
+
+The embedding module generates a vector for each chunk using the local embedding model. The vector-store module builds the FAISS index. When a question is submitted, the retriever searches for the closest chunks and removes results that exceed the configured distance threshold.
+
+If no passages remain, the pipeline returns the fallback without calling Gemini. If passages remain, the generator sends the question and those passages to Gemini. The interface then displays the answer and the retrieved passages so the user can inspect the evidence.
+
+14. Limitations and Responsible Use
+The application is a small educational prototype, not a production-grade knowledge system. It does not currently perform OCR, save the vector index permanently, or automatically evaluate answer quality using a labelled test set.
+
+The system can fail when source documents are incomplete, text extraction is poor, chunk boundaries separate related details, retrieval returns weak passages, or the language model misinterprets evidence. A fallback based on a distance threshold can also reject a question that the documents actually answer.
+
+Users should verify important statements against the source passages. The application should not be presented as guaranteeing factual correctness or eliminating hallucinations.
+
+15. Suggested Testing Questions
+Use these questions to test whether retrieval and answer generation behave as intended:
+- What is Retrieval-Augmented Generation?
+- What are the main stages of the RAG workflow?
+- Why is chunk overlap useful?
+- What is the role of embeddings?
+- What does FAISS do in this project?
+- Which components run locally and which use the Gemini API?
+- Why is a retrieval distance threshold only a heuristic?
+- What is the exact fallback response?
+- Does the project currently support OCR for scanned PDFs?
+- Does the application permanently save its vector index?
+- What is the capital of Japan?
+
+The final question is intentionally not answered in these notes. The application should avoid supplying an answer from general knowledge and should instead use its configured fallback when the retrieved evidence is insufficient.

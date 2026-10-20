@@ -1,0 +1,14 @@
+.venv/
+__pycache__/
+*.py[cod]
+.env
+.env.*
+!.env.example
+.streamlit/secrets.toml
+.DS_Store
+faiss_index/
+chroma-db/
+*.log
+.pytest_cache/
+.mypy_cache/
+.ruff_cache/
