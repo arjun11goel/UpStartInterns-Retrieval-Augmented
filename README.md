@@ -85,7 +85,3 @@ Use `sample_documents/example_notes.txt`:
 - What are the five stages of a RAG pipeline?
 - What does chunk overlap do?
 - What is the capital of Japan? (Not answered in the sample document.)
-
-## Public GitHub submission
-
-Run `git status` before committing. Commit source files, README, requirements, `.env.example`, and sample documents. Do not commit `.env`, private documents, or API keys.
